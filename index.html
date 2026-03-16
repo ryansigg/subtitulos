@@ -335,7 +335,7 @@ function friendlyError(status, msg) {
 }
 
 async function osGet(url, apiKey) {
-  const r = await fetch(url, { headers: { 'Api-Key': apiKey, 'Content-Type':'application/json', 'User-Agent':'Subtitulos/1.0' } });
+  const r = await fetch(url, { headers: { 'Api-Key': apiKey } });
   if (!r.ok) { const d=await r.json().catch(()=>({})); friendlyError(r.status, d.message); }
   return r.json();
 }
