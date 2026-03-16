@@ -101,6 +101,10 @@
   .key-row input { flex:1; font-size:.8rem; }
   .key-toggle { background:none; border:1px solid var(--border); border-radius:6px; color:var(--text-secondary); font-size:.68rem; padding:.38rem .6rem; cursor:pointer; flex-shrink:0; font-family:'DM Sans',sans-serif; }
 
+  .account-bar { display:flex; align-items:center; justify-content:space-between; }
+  .account-info .account-name { font-size:.85rem; color:var(--text-primary); }
+  .account-info .account-quota { font-size:.68rem; color:var(--text-secondary); margin-top:.1rem; }
+
   /* PLAYER */
   #player { display:none; flex-direction:column; height:100dvh; overflow:hidden; }
   .top-bar { display:flex; align-items:center; justify-content:space-between; padding:.7rem 1rem; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; }
@@ -150,15 +154,30 @@
     <div class="app-subtitle">Subtitle Companion</div>
   </div>
 
-  <!-- API Key -->
-  <div>
-    <div class="section-label">OpenSubtitles API Key</div>
+  <!-- Account -->
+  <div id="login-section">
+    <div class="section-label">OpenSubtitles Account</div>
     <div class="card">
+      <input type="text" id="os-username" placeholder="Username" autocomplete="username">
       <div class="key-row">
-        <input type="password" id="api-key" placeholder="Paste your API key here…">
-        <button class="key-toggle" id="key-toggle">Show</button>
+        <input type="password" id="os-password" placeholder="Password" autocomplete="current-password">
+        <button class="fetch-btn" id="login-btn">Sign In</button>
       </div>
-      <div style="font-size:.68rem;color:var(--text-dim)">Free at <strong style="color:var(--text-secondary)">opensubtitles.com</strong> → My Profile → API Consumer</div>
+      <div class="status-msg" id="login-status"></div>
+      <div style="font-size:.68rem;color:var(--text-dim)">Free account at <strong style="color:var(--text-secondary)">opensubtitles.com</strong> · 20 downloads/day</div>
+    </div>
+  </div>
+
+  <div id="account-section" style="display:none">
+    <div class="section-label">Account</div>
+    <div class="card">
+      <div class="account-bar">
+        <div class="account-info">
+          <div class="account-name" id="account-name"></div>
+          <div class="account-quota" id="account-quota"></div>
+        </div>
+        <button class="key-toggle" id="logout-btn">Sign out</button>
+      </div>
     </div>
   </div>
 
@@ -267,20 +286,88 @@ function srtTime(s) {
 let esCues=[], enCues=[], esReady=false, enReady=false;
 let startTime=null, elapsed=0, running=false, offset=0, tickId=null, lastActiveIdx=-2;
 let selectedEsId=null, selectedEnId=null;
+let authToken = localStorage.getItem('os_token') || null;
+let authUsername = localStorage.getItem('os_username') || '';
 
-// ── API key toggle ───────────────────────────────────────────
-document.getElementById('key-toggle').addEventListener('click', () => {
-  const inp = document.getElementById('api-key');
-  const btn = document.getElementById('key-toggle');
-  inp.type = inp.type==='password' ? 'text' : 'password';
-  btn.textContent = inp.type==='password' ? 'Show' : 'Hide';
+// ── Auth helpers ─────────────────────────────────────────────
+function authHeaders(extra={}) {
+  return authToken
+    ? { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json', ...extra }
+    : { 'Content-Type': 'application/json', ...extra };
+}
+
+function showLoggedIn(username, quota) {
+  document.getElementById('login-section').style.display = 'none';
+  document.getElementById('account-section').style.display = 'block';
+  document.getElementById('account-name').textContent = username;
+  if (quota != null) {
+    document.getElementById('account-quota').textContent = `${quota} download${quota===1?'':'s'} remaining today`;
+  }
+}
+
+function showLoggedOut() {
+  authToken = null; authUsername = '';
+  localStorage.removeItem('os_token'); localStorage.removeItem('os_username');
+  document.getElementById('account-section').style.display = 'none';
+  document.getElementById('login-section').style.display = 'block';
+  document.getElementById('os-password').value = '';
+  setStatus('login-status', '', '');
+}
+
+// ── Login ────────────────────────────────────────────────────
+document.getElementById('login-btn').addEventListener('click', async () => {
+  const username = document.getElementById('os-username').value.trim();
+  const password = document.getElementById('os-password').value;
+  if (!username || !password) { setStatus('login-status','err','Enter your username and password.'); return; }
+
+  setStatus('login-status','loading','<span class="spinner"></span>Signing in…');
+  document.getElementById('login-btn').disabled = true;
+
+  try {
+    const r = await fetch('http://127.0.0.1:3000/api/v1/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      if (r.status === 401) setStatus('login-status','err','Incorrect username or password.');
+      else setStatus('login-status','err', data.message || `Error ${r.status}`);
+      return;
+    }
+    authToken = data.token;
+    authUsername = username;
+    localStorage.setItem('os_token', authToken);
+    localStorage.setItem('os_username', authUsername);
+    setStatus('login-status', '', '');
+    showLoggedIn(authUsername, null);
+  } catch(e) {
+    setStatus('login-status','err','Could not reach proxy. Is it running?');
+  } finally {
+    document.getElementById('login-btn').disabled = false;
+  }
 });
+
+// ── Logout ───────────────────────────────────────────────────
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  try {
+    await fetch('http://127.0.0.1:3000/api/v1/logout', {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+  } catch(_) { /* best-effort */ }
+  showLoggedOut();
+});
+
+// ── Restore session on load ──────────────────────────────────
+if (authToken) showLoggedIn(authUsername, null);
 
 // ── Search ───────────────────────────────────────────────────
 document.getElementById('search-btn').addEventListener('click', searchSubtitles);
 
 async function searchSubtitles() {
-  const apiKey = document.getElementById('api-key').value.trim();
+  if (!authToken) { setStatus('search-status','err','Sign in to your OpenSubtitles account first.'); return; }
+
   const title  = document.getElementById('show-title').value.trim();
   const season = document.getElementById('season-num').value.trim();
   const ep     = document.getElementById('episode-num').value.trim();
@@ -300,8 +387,8 @@ async function searchSubtitles() {
     const enParams = new URLSearchParams(baseParams); enParams.set('languages', 'en'); enParams.sort();
 
     const [esRes, enRes] = await Promise.all([
-      osGet(`http://127.0.0.1:3000/api/v1/subtitles?${esParams}`, apiKey),
-      osGet(`http://127.0.0.1:3000/api/v1/subtitles?${enParams}`, apiKey),
+      osGet(`http://127.0.0.1:3000/api/v1/subtitles?${esParams}`),
+      osGet(`http://127.0.0.1:3000/api/v1/subtitles?${enParams}`),
     ]);
 
     const esData = esRes.data || [];
@@ -319,8 +406,8 @@ async function searchSubtitles() {
     document.getElementById('results-section').style.display = 'block';
 
   } catch(e) {
-    if (e.message==='RATE_LIMIT') setStatus('search-status','err','⏱ Daily download limit reached (10/day on free accounts). Try again tomorrow, or use manual .srt upload below.');
-    else if (e.message==='BAD_KEY') setStatus('search-status','err','🔑 Invalid API key. Double-check it at opensubtitles.com → My Profile → API Consumer.');
+    if (e.message==='RATE_LIMIT') setStatus('search-status','err','⏱ Daily download limit reached. Resets at midnight UTC, or use manual .srt upload below.');
+    else if (e.message==='AUTH') { setStatus('search-status','err','Session expired. Please sign in again.'); showLoggedOut(); }
     else setStatus('search-status','err',`Error: ${e.message}`);
   }
   document.getElementById('search-btn').disabled = false;
@@ -331,14 +418,13 @@ function friendlyError(status, msg) {
     throw new Error('RATE_LIMIT');
   }
   if (status === 401 || status === 403) {
-    throw new Error('BAD_KEY');
+    throw new Error('AUTH');
   }
   throw new Error(msg || `HTTP ${status}`);
 }
 
-async function osGet(url, apiKey) {
-  const headers = apiKey ? { 'Api-Key': apiKey } : {};
-  const r = await fetch(url, { headers });
+async function osGet(url) {
+  const r = await fetch(url, { headers: authHeaders() });
   if (!r.ok) { const d=await r.json().catch(()=>({})); friendlyError(r.status, d.message); }
   return r.json();
 }
@@ -392,13 +478,12 @@ function selectTrack(lang, fileId, idx) {
 }
 
 async function downloadSelected() {
-  const apiKey = document.getElementById('api-key').value.trim();
   setStatus('dl-status','loading','<span class="spinner"></span>Downloading…');
   document.getElementById('download-btn').disabled = true;
   try {
     const [esText, enText] = await Promise.all([
-      downloadFile(selectedEsId, apiKey),
-      downloadFile(selectedEnId, apiKey),
+      downloadFile(selectedEsId),
+      downloadFile(selectedEnId),
     ]);
     esCues = parseSRT(esText);
     enCues = parseSRT(enText);
@@ -407,22 +492,24 @@ async function downloadSelected() {
     setStatus('dl-status','ok',`✓ ${esCues.length} Spanish · ${enCues.length} English cues ready`);
     document.getElementById('start-btn').disabled = false;
   } catch(e) {
-    if (e.message==='RATE_LIMIT') setStatus('dl-status','err','⏱ Daily download limit reached (10/day on free accounts). Resets at midnight UTC. Use manual .srt upload below to continue today.');
-    else if (e.message==='BAD_KEY') setStatus('dl-status','err','🔑 Invalid API key. Double-check it at opensubtitles.com → My Profile → API Consumer.');
+    if (e.message==='RATE_LIMIT') setStatus('dl-status','err','⏱ Daily download limit reached. Resets at midnight UTC. Use manual .srt upload below to continue today.');
+    else if (e.message==='AUTH') { setStatus('dl-status','err','Session expired. Please sign in again.'); showLoggedOut(); }
     else setStatus('dl-status','err',`Failed: ${e.message}`);
     document.getElementById('download-btn').disabled = false;
   }
 }
 
-async function downloadFile(fileId, apiKey) {
+async function downloadFile(fileId) {
   const r = await fetch('http://127.0.0.1:3000/api/v1/download', {
-    method:'POST',
-    headers:{ ...(apiKey ? { 'Api-Key': apiKey } : {}), 'Content-Type':'application/json' },
-    body: JSON.stringify({ file_id: fileId, sub_format:'srt' })
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ file_id: fileId, sub_format: 'srt' }),
   });
   if (!r.ok) { const d=await r.json().catch(()=>({})); friendlyError(r.status, d.message); }
   const data = await r.json();
-  // OpenSubtitles also returns remaining quota in the response
+  if (data.remaining !== undefined) {
+    document.getElementById('account-quota').textContent = `${data.remaining} download${data.remaining===1?'':'s'} remaining today`;
+  }
   if (data.remaining !== undefined && data.remaining <= 0) friendlyError(429, 'quota');
   if (!data.link) throw new Error('No download link returned.');
   const srtRes = await fetch(data.link);
