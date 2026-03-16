@@ -285,7 +285,6 @@ async function searchSubtitles() {
   const season = document.getElementById('season-num').value.trim();
   const ep     = document.getElementById('episode-num').value.trim();
 
-  if (!apiKey) { setStatus('search-status','err','Please enter your API key first.'); return; }
   if (!title)  { setStatus('search-status','err','Please enter a show title.'); return; }
 
   setStatus('search-status','loading','<span class="spinner"></span>Searching OpenSubtitles…');
@@ -338,7 +337,8 @@ function friendlyError(status, msg) {
 }
 
 async function osGet(url, apiKey) {
-  const r = await fetch(url, { headers: { 'Api-Key': apiKey } });
+  const headers = apiKey ? { 'Api-Key': apiKey } : {};
+  const r = await fetch(url, { headers });
   if (!r.ok) { const d=await r.json().catch(()=>({})); friendlyError(r.status, d.message); }
   return r.json();
 }
@@ -417,7 +417,7 @@ async function downloadSelected() {
 async function downloadFile(fileId, apiKey) {
   const r = await fetch('https://api.opensubtitles.com/api/v1/download', {
     method:'POST',
-    headers:{ 'Api-Key':apiKey, 'Content-Type':'application/json', 'User-Agent':'Subtitulos/1.0' },
+    headers:{ ...(apiKey ? { 'Api-Key': apiKey } : {}), 'Content-Type':'application/json' },
     body: JSON.stringify({ file_id: fileId, sub_format:'srt' })
   });
   if (!r.ok) { const d=await r.json().catch(()=>({})); friendlyError(r.status, d.message); }
