@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Subtítulos</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --surface: #111114;
+    --surface2: #1a1a1f;
+    --border: #2a2a32;
+    --accent: #c8923a;
+    --accent2: #e8b86d;
+    --text-primary: #f0ead8;
+    --text-secondary: #8a8070;
+    --text-dim: #4a4440;
+    --spanish: #f5edd8;
+    --english: #9a8060;
+    --highlight-bg: rgba(200, 146, 58, 0.08);
+    --highlight-border: rgba(200, 146, 58, 0.3);
+    --error: #c85a3a;
+    --success: #5a9a6a;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    background:var(--bg); color:var(--text-primary);
+    font-family:'DM Sans',sans-serif; min-height:100dvh;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+
+  /* SETUP */
+  #setup { flex:1; display:flex; flex-direction:column; padding:1.75rem 1.5rem; gap:1.4rem; overflow-y:auto; }
+  .app-header { text-align:center; padding-top:0.25rem; }
+  .app-title { font-family:'Playfair Display',serif; font-size:1.9rem; font-weight:400; letter-spacing:.05em; color:var(--accent2); }
+  .app-subtitle { font-size:.7rem; color:var(--text-secondary); letter-spacing:.15em; text-transform:uppercase; margin-top:.25rem; }
+
+  .section-label { font-size:.68rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text-secondary); margin-bottom:.4rem; }
+
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.1rem 1.25rem; display:flex; flex-direction:column; gap:.7rem; }
+
+  input[type="text"],input[type="number"],input[type="password"] {
+    background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+    color:var(--text-primary); font-family:'DM Sans',sans-serif; font-size:.9rem;
+    padding:.6rem .85rem; width:100%; outline:none; transition:border-color .2s;
+  }
+  input::placeholder { color:var(--text-dim); }
+  input:focus { border-color:var(--accent); }
+
+  .row { display:flex; gap:.6rem; }
+  .row input { flex:1; }
+  .narrow { flex:0 0 72px !important; }
+
+  .fetch-btn {
+    background:var(--accent); color:#0a0a0c; border:none; border-radius:8px;
+    padding:.62rem 1rem; font-family:'DM Sans',sans-serif; font-size:.85rem; font-weight:500;
+    cursor:pointer; transition:background .2s; white-space:nowrap; flex-shrink:0;
+  }
+  .fetch-btn:disabled { background:var(--border); color:var(--text-dim); cursor:not-allowed; }
+  .fetch-btn:not(:disabled):active { background:var(--accent2); }
+
+  .status-msg { font-size:.73rem; line-height:1.5; min-height:1rem; }
+  .status-msg.loading { color:var(--text-secondary); font-style:italic; }
+  .status-msg.ok { color:var(--success); }
+  .status-msg.err { color:var(--error); }
+
+  .track-row { display:flex; align-items:center; gap:.6rem; padding:.45rem .1rem; cursor:pointer; }
+  .track-info { flex:1; min-width:0; }
+  .track-name { font-size:.78rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .track-meta { font-size:.65rem; color:var(--text-secondary); margin-top:.1rem; }
+  .track-badge { font-size:.63rem; padding:.18rem .5rem; border-radius:4px; background:var(--surface2); border:1px solid var(--border); color:var(--text-secondary); flex-shrink:0; }
+  .track-badge.active { background:rgba(200,146,58,.15); border-color:var(--accent); color:var(--accent2); }
+
+  .divider { height:1px; background:var(--border); margin:.2rem 0; }
+
+  .toggle-manual { font-size:.7rem; color:var(--text-secondary); text-align:center; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+  .manual-section { display:none; flex-direction:column; gap:.7rem; }
+  .manual-section.visible { display:flex; }
+
+  .upload-box {
+    background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+    padding:.8rem; display:flex; align-items:center; gap:.7rem; cursor:pointer; position:relative; transition:border-color .2s;
+  }
+  .upload-box.loaded { border-color:var(--success); }
+  .upload-box input[type="file"] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+  .upload-box-icon { font-size:1.1rem; flex-shrink:0; }
+  .upload-box-text { font-size:.78rem; color:var(--text-secondary); }
+  .upload-box-text strong { display:block; color:var(--text-primary); font-size:.82rem; }
+  .upload-box.loaded .upload-box-text { color:var(--success); }
+
+  .start-btn {
+    background:var(--accent); color:#0a0a0c; border:none; border-radius:12px;
+    padding:1rem; font-family:'DM Sans',sans-serif; font-size:.95rem; font-weight:500;
+    letter-spacing:.05em; cursor:pointer; transition:background .2s, transform .1s;
+  }
+  .start-btn:disabled { background:var(--border); color:var(--text-dim); cursor:not-allowed; }
+  .start-btn:not(:disabled):active { transform:scale(.98); background:var(--accent2); }
+
+  .key-row { display:flex; gap:.6rem; align-items:center; }
+  .key-row input { flex:1; font-size:.8rem; }
+  .key-toggle { background:none; border:1px solid var(--border); border-radius:6px; color:var(--text-secondary); font-size:.68rem; padding:.38rem .6rem; cursor:pointer; flex-shrink:0; font-family:'DM Sans',sans-serif; }
+
+  /* PLAYER */
+  #player { display:none; flex-direction:column; height:100dvh; overflow:hidden; }
+  .top-bar { display:flex; align-items:center; justify-content:space-between; padding:.7rem 1rem; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; }
+  .time-display { font-size:.73rem; color:var(--text-secondary); letter-spacing:.08em; font-variant-numeric:tabular-nums; text-align:center; }
+  .time-display .t { color:var(--accent2); font-weight:500; }
+  .back-btn { background:none; border:none; color:var(--text-secondary); font-size:.73rem; cursor:pointer; letter-spacing:.08em; text-transform:uppercase; font-family:'DM Sans',sans-serif; }
+
+  .subtitle-scroll { flex:1; overflow-y:auto; padding:1rem 1.25rem; display:flex; flex-direction:column; gap:.15rem; scroll-behavior:smooth; -webkit-overflow-scrolling:touch; }
+
+  .subtitle-item { padding:.7rem 1rem; border-radius:10px; border:1px solid transparent; transition:all .3s ease; }
+  .subtitle-item.past { opacity:.22; }
+  .subtitle-item.active { background:var(--highlight-bg); border-color:var(--highlight-border); opacity:1; }
+  .subtitle-item.upcoming { opacity:.5; }
+
+  .sub-time { font-size:.58rem; color:var(--text-dim); letter-spacing:.08em; margin-bottom:.28rem; font-variant-numeric:tabular-nums; }
+  .active .sub-time { color:var(--accent); }
+  .sub-spanish { font-family:'Playfair Display',serif; font-size:1.05rem; color:var(--spanish); line-height:1.45; }
+  .active .sub-spanish { font-size:1.1rem; color:#fff; }
+  .sub-english { font-size:.78rem; color:var(--english); margin-top:.28rem; line-height:1.4; max-height:0; overflow:hidden; opacity:0; transition:max-height .25s ease, opacity .25s ease; }
+  .active .sub-english { max-height:80px; opacity:.65; }
+  .subtitle-item.revealed .sub-english { max-height:80px; opacity:.55; }
+
+  .cue-divider { height:1px; background:var(--border); opacity:.2; margin:.1rem 0; }
+
+  .controls { background:var(--surface); border-top:1px solid var(--border); padding:.7rem 1rem 1.2rem; flex-shrink:0; }
+  .play-row { display:flex; align-items:center; justify-content:center; gap:1rem; margin-bottom:.6rem; }
+  .ctrl-btn { background:var(--surface2); border:1px solid var(--border); border-radius:10px; color:var(--text-primary); font-family:'DM Sans',sans-serif; font-size:.73rem; cursor:pointer; padding:.48rem .85rem; transition:background .15s; white-space:nowrap; }
+  .ctrl-btn:active { background:var(--border); }
+  .play-pause-btn { background:var(--accent); border-color:var(--accent); color:#0a0a0c; font-size:.85rem; font-weight:500; padding:.62rem 1.7rem; border-radius:50px; }
+  .play-pause-btn:active { background:var(--accent2); }
+
+  .nudge-row { display:flex; align-items:center; justify-content:center; gap:.45rem; margin-bottom:.45rem; }
+  .nudge-label { font-size:.6rem; color:var(--text-dim); letter-spacing:.1em; text-transform:uppercase; }
+  .nudge-btn { background:none; border:1px solid var(--border); border-radius:7px; color:var(--text-secondary); font-size:.67rem; padding:.28rem .52rem; cursor:pointer; font-family:'DM Sans',sans-serif; }
+  .nudge-btn:active { border-color:var(--accent); color:var(--accent2); }
+  .tap-hint { text-align:center; font-size:.6rem; color:var(--text-dim); letter-spacing:.08em; }
+
+  .spinner { display:inline-block; width:11px; height:11px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:5px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="setup">
+  <div class="app-header">
+    <div class="app-title">Subtítulos</div>
+    <div class="app-subtitle">Subtitle Companion</div>
+  </div>
+
+  <!-- API Key -->
+  <div>
+    <div class="section-label">OpenSubtitles API Key</div>
+    <div class="card">
+      <div class="key-row">
+        <input type="password" id="api-key" placeholder="Paste your API key here…">
+        <button class="key-toggle" id="key-toggle">Show</button>
+      </div>
+      <div style="font-size:.68rem;color:var(--text-dim)">Free at <strong style="color:var(--text-secondary)">opensubtitles.com</strong> → My Profile → API Consumer</div>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div>
+    <div class="section-label">Find Episode</div>
+    <div class="card">
+      <input type="text" id="show-title" placeholder="Show title  (e.g. Narcos)">
+      <div class="row">
+        <input type="number" id="season-num" placeholder="Season" class="narrow" min="1">
+        <input type="number" id="episode-num" placeholder="Episode" class="narrow" min="1">
+        <button class="fetch-btn" id="search-btn">Search</button>
+      </div>
+      <div class="status-msg" id="search-status"></div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results-section" style="display:none">
+    <div class="section-label">Select Tracks</div>
+    <div class="card" id="results-card">
+      <div style="font-size:.7rem;color:var(--text-secondary)">🇪🇸 Spanish</div>
+      <div id="es-results"></div>
+      <div class="divider"></div>
+      <div style="font-size:.7rem;color:var(--text-secondary)">🇬🇧 English</div>
+      <div id="en-results"></div>
+      <div class="status-msg" id="dl-status"></div>
+    </div>
+  </div>
+
+  <!-- Manual fallback -->
+  <div>
+    <div class="toggle-manual" id="toggle-manual">or upload .srt files manually</div>
+    <div class="manual-section" id="manual-section">
+      <div class="upload-box" id="es-box">
+        <input type="file" accept=".srt" id="es-file">
+        <div class="upload-box-icon">🇪🇸</div>
+        <div class="upload-box-text"><strong>Spanish .srt</strong>Tap to upload</div>
+      </div>
+      <div class="upload-box" id="en-box">
+        <input type="file" accept=".srt" id="en-file">
+        <div class="upload-box-icon">🇬🇧</div>
+        <div class="upload-box-text"><strong>English .srt</strong>Tap to upload</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="start-btn" id="start-btn" disabled>Start Episode →</button>
+</div>
+
+<!-- PLAYER -->
+<div id="player">
+  <div class="top-bar">
+    <button class="back-btn" id="back-btn">← Setup</button>
+    <div class="time-display"><span class="t" id="current-time-display">0:00</span><span style="color:var(--text-dim)"> / </span><span id="total-time-display">—</span></div>
+    <div style="width:44px"></div>
+  </div>
+  <div class="subtitle-scroll" id="subtitle-scroll"></div>
+  <div class="controls">
+    <div class="play-row">
+      <button class="ctrl-btn" id="restart-btn">↺ Restart</button>
+      <button class="play-pause-btn ctrl-btn" id="play-pause-btn">⏸ Pause</button>
+      <button class="ctrl-btn" id="jump-btn">→ Now</button>
+    </div>
+    <div class="nudge-row">
+      <span class="nudge-label">Sync</span>
+      <button class="nudge-btn" id="nudge-m5">−5s</button>
+      <button class="nudge-btn" id="nudge-m2">−2s</button>
+      <button class="nudge-btn" id="nudge-m1">−1s</button>
+      <button class="nudge-btn" id="nudge-p1">+1s</button>
+      <button class="nudge-btn" id="nudge-p2">+2s</button>
+      <button class="nudge-btn" id="nudge-p5">+5s</button>
+    </div>
+    <div class="tap-hint">tap any subtitle to reveal English</div>
+  </div>
+</div>
+
+<script>
+// ── SRT Parser ──────────────────────────────────────────────
+function parseSRT(text) {
+  const cues = [];
+  const blocks = text.trim().replace(/\r\n/g,'\n').replace(/\r/g,'\n').split(/\n\n+/);
+  for (const block of blocks) {
+    const lines = block.trim().split('\n');
+    let tsLine = -1;
+    for (let i = 0; i < lines.length; i++) { if (lines[i].includes('-->')) { tsLine=i; break; } }
+    if (tsLine === -1) continue;
+    const ts = lines[tsLine].match(/(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)/);
+    if (!ts) continue;
+    const start = +ts[1]*3600 + +ts[2]*60 + +ts[3] + +ts[4]/1000;
+    const end   = +ts[5]*3600 + +ts[6]*60 + +ts[7] + +ts[8]/1000;
+    const txt   = lines.slice(tsLine+1).join(' ').replace(/<[^>]+>/g,'').trim();
+    if (txt) cues.push({ start, end, text: txt });
+  }
+  return cues.sort((a,b)=>a.start-b.start);
+}
+
+function srtTime(s) {
+  s = Math.max(0,s);
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=Math.floor(s%60);
+  if (h>0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  return `${m}:${String(sec).padStart(2,'0')}`;
+}
+
+// ── State ────────────────────────────────────────────────────
+let esCues=[], enCues=[], esReady=false, enReady=false;
+let startTime=null, elapsed=0, running=false, offset=0, tickId=null, lastActiveIdx=-2;
+let selectedEsId=null, selectedEnId=null;
+
+// ── API key toggle ───────────────────────────────────────────
+document.getElementById('key-toggle').addEventListener('click', () => {
+  const inp = document.getElementById('api-key');
+  const btn = document.getElementById('key-toggle');
+  inp.type = inp.type==='password' ? 'text' : 'password';
+  btn.textContent = inp.type==='password' ? 'Show' : 'Hide';
+});
+
+// ── Search ───────────────────────────────────────────────────
+document.getElementById('search-btn').addEventListener('click', searchSubtitles);
+
+async function searchSubtitles() {
+  const apiKey = document.getElementById('api-key').value.trim();
+  const title  = document.getElementById('show-title').value.trim();
+  const season = document.getElementById('season-num').value.trim();
+  const ep     = document.getElementById('episode-num').value.trim();
+
+  if (!apiKey) { setStatus('search-status','err','Please enter your API key first.'); return; }
+  if (!title)  { setStatus('search-status','err','Please enter a show title.'); return; }
+
+  setStatus('search-status','loading','<span class="spinner"></span>Searching OpenSubtitles…');
+  document.getElementById('search-btn').disabled = true;
+  document.getElementById('results-section').style.display = 'none';
+
+  try {
+    const params = new URLSearchParams({ query: title, type: 'episode' });
+    if (season) params.set('season_number', season);
+    if (ep)     params.set('episode_number', ep);
+
+    const [esRes, enRes] = await Promise.all([
+      osGet(`https://api.opensubtitles.com/api/v1/subtitles?${params}&languages=es`, apiKey),
+      osGet(`https://api.opensubtitles.com/api/v1/subtitles?${params}&languages=en`, apiKey),
+    ]);
+
+    const esData = esRes.data || [];
+    const enData = enRes.data || [];
+
+    if (!esData.length && !enData.length) {
+      setStatus('search-status','err','No subtitles found. Try adjusting the title or season/episode.');
+      document.getElementById('search-btn').disabled = false;
+      return;
+    }
+
+    setStatus('search-status','ok',`Found ${esData.length} Spanish · ${enData.length} English`);
+    renderResults('es-results', esData.slice(0,5), 'es');
+    renderResults('en-results', enData.slice(0,5), 'en');
+    document.getElementById('results-section').style.display = 'block';
+
+  } catch(e) {
+    if (e.message==='RATE_LIMIT') setStatus('search-status','err','⏱ Daily download limit reached (10/day on free accounts). Try again tomorrow, or use manual .srt upload below.');
+    else if (e.message==='BAD_KEY') setStatus('search-status','err','🔑 Invalid API key. Double-check it at opensubtitles.com → My Profile → API Consumer.');
+    else setStatus('search-status','err',`Error: ${e.message}`);
+  }
+  document.getElementById('search-btn').disabled = false;
+}
+
+function friendlyError(status, msg) {
+  if (status === 429 || (msg && msg.toLowerCase().includes('quota'))) {
+    throw new Error('RATE_LIMIT');
+  }
+  if (status === 401 || status === 403) {
+    throw new Error('BAD_KEY');
+  }
+  throw new Error(msg || `HTTP ${status}`);
+}
+
+async function osGet(url, apiKey) {
+  const r = await fetch(url, { headers: { 'Api-Key': apiKey, 'Content-Type':'application/json', 'User-Agent':'Subtitulos/1.0' } });
+  if (!r.ok) { const d=await r.json().catch(()=>({})); friendlyError(r.status, d.message); }
+  return r.json();
+}
+
+function renderResults(containerId, data, lang) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  if (!data.length) {
+    el.innerHTML = `<div style="font-size:.73rem;color:var(--text-dim);padding:.2rem 0">None found</div>`;
+    return;
+  }
+  data.forEach((item, i) => {
+    const attrs  = item.attributes || {};
+    const fileId = (attrs.files||[])[0]?.file_id;
+    const name   = attrs.release || attrs.feature_details?.title || `Option ${i+1}`;
+    const dl     = attrs.download_count || 0;
+    const rating = attrs.ratings ? `★ ${parseFloat(attrs.ratings).toFixed(1)}` : '';
+
+    const row = document.createElement('div');
+    row.className = 'track-row';
+    row.dataset.fileId = fileId;
+    row.innerHTML = `
+      <div class="track-info">
+        <div class="track-name">${name}</div>
+        <div class="track-meta">${dl.toLocaleString()} downloads ${rating}</div>
+      </div>
+      <div class="track-badge" id="badge-${lang}-${i}">Select</div>
+    `;
+    row.addEventListener('click', () => selectTrack(lang, fileId, i));
+    el.appendChild(row);
+    if (i===0) selectTrack(lang, fileId, 0);
+  });
+}
+
+function selectTrack(lang, fileId, idx) {
+  document.querySelectorAll(`#${lang}-results .track-badge`).forEach((b,i) => {
+    b.classList.toggle('active', i===idx);
+    b.textContent = i===idx ? '✓ Selected' : 'Select';
+  });
+  if (lang==='es') selectedEsId = fileId;
+  if (lang==='en') selectedEnId = fileId;
+
+  if (selectedEsId && selectedEnId && !document.getElementById('download-btn')) {
+    const btn = document.createElement('button');
+    btn.className = 'fetch-btn'; btn.id = 'download-btn';
+    btn.style.cssText = 'width:100%;margin-top:.1rem';
+    btn.textContent = 'Download Selected Subtitles';
+    btn.addEventListener('click', downloadSelected);
+    document.getElementById('results-card').appendChild(btn);
+  }
+}
+
+async function downloadSelected() {
+  const apiKey = document.getElementById('api-key').value.trim();
+  setStatus('dl-status','loading','<span class="spinner"></span>Downloading…');
+  document.getElementById('download-btn').disabled = true;
+  try {
+    const [esText, enText] = await Promise.all([
+      downloadFile(selectedEsId, apiKey),
+      downloadFile(selectedEnId, apiKey),
+    ]);
+    esCues = parseSRT(esText);
+    enCues = parseSRT(enText);
+    if (!esCues.length || !enCues.length) throw new Error('Could not parse subtitle files.');
+    esReady = enReady = true;
+    setStatus('dl-status','ok',`✓ ${esCues.length} Spanish · ${enCues.length} English cues ready`);
+    document.getElementById('start-btn').disabled = false;
+  } catch(e) {
+    if (e.message==='RATE_LIMIT') setStatus('dl-status','err','⏱ Daily download limit reached (10/day on free accounts). Resets at midnight UTC. Use manual .srt upload below to continue today.');
+    else if (e.message==='BAD_KEY') setStatus('dl-status','err','🔑 Invalid API key. Double-check it at opensubtitles.com → My Profile → API Consumer.');
+    else setStatus('dl-status','err',`Failed: ${e.message}`);
+    document.getElementById('download-btn').disabled = false;
+  }
+}
+
+async function downloadFile(fileId, apiKey) {
+  const r = await fetch('https://api.opensubtitles.com/api/v1/download', {
+    method:'POST',
+    headers:{ 'Api-Key':apiKey, 'Content-Type':'application/json', 'User-Agent':'Subtitulos/1.0' },
+    body: JSON.stringify({ file_id: fileId, sub_format:'srt' })
+  });
+  if (!r.ok) { const d=await r.json().catch(()=>({})); friendlyError(r.status, d.message); }
+  const data = await r.json();
+  // OpenSubtitles also returns remaining quota in the response
+  if (data.remaining !== undefined && data.remaining <= 0) friendlyError(429, 'quota');
+  if (!data.link) throw new Error('No download link returned.');
+  const srtRes = await fetch(data.link);
+  if (!srtRes.ok) throw new Error('Could not fetch subtitle file.');
+  return srtRes.text();
+}
+
+// ── Manual upload ────────────────────────────────────────────
+document.getElementById('toggle-manual').addEventListener('click', () => {
+  document.getElementById('manual-section').classList.toggle('visible');
+});
+
+['es','en'].forEach(lang => {
+  document.getElementById(`${lang}-file`).addEventListener('change', e => {
+    const f = e.target.files[0]; if (!f) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const cues = parseSRT(ev.target.result);
+      if (!cues.length) return;
+      if (lang==='es') { esCues=cues; esReady=true; }
+      else             { enCues=cues; enReady=true; }
+      const box = document.getElementById(`${lang}-box`);
+      box.classList.add('loaded');
+      box.querySelector('.upload-box-text').innerHTML = `<strong>${lang==='es'?'Spanish':'English'} loaded</strong>${cues.length} cues`;
+      if (esReady && enReady) document.getElementById('start-btn').disabled = false;
+    };
+    reader.readAsText(f);
+  });
+});
+
+// ── Helpers ──────────────────────────────────────────────────
+function setStatus(id, type, html) {
+  const el = document.getElementById(id);
+  el.className = `status-msg ${type}`;
+  el.innerHTML = html;
+}
+
+function matchEnglish(esStart, esEnd) {
+  let best=null, bestScore=-Infinity;
+  for (const en of enCues) {
+    const overlap = Math.min(esEnd,en.end) - Math.max(esStart,en.start);
+    const score = overlap>0 ? overlap*10 : -Math.abs(en.start-esStart);
+    if (score>bestScore) { bestScore=score; best=en; }
+  }
+  return best ? best.text : '';
+}
+
+// ── Build subtitle list ──────────────────────────────────────
+function buildSubtitleList() {
+  const scroll = document.getElementById('subtitle-scroll');
+  scroll.innerHTML = '';
+  const last = esCues[esCues.length-1];
+  if (last) document.getElementById('total-time-display').textContent = srtTime(last.end);
+  esCues.forEach((cue,i) => {
+    const en = matchEnglish(cue.start, cue.end);
+    const item = document.createElement('div');
+    item.className = 'subtitle-item upcoming';
+    item.dataset.idx = i;
+    item.innerHTML = `
+      <div class="sub-time">${srtTime(cue.start)}</div>
+      <div class="sub-spanish">${cue.text}</div>
+      ${en ? `<div class="sub-english">${en}</div>` : ''}
+    `;
+    item.addEventListener('click', () => {
+      if (!item.classList.contains('active')) item.classList.toggle('revealed');
+    });
+    scroll.appendChild(item);
+    if (i < esCues.length-1) {
+      const d = document.createElement('div');
+      d.className = 'cue-divider';
+      scroll.appendChild(d);
+    }
+  });
+}
+
+// ── Playback engine ──────────────────────────────────────────
+function tick() {
+  if (!running) return;
+  elapsed = (performance.now()-startTime)/1000 + offset;
+  document.getElementById('current-time-display').textContent = srtTime(elapsed);
+  let activeIdx = -1;
+  for (let i=0; i<esCues.length; i++) {
+    if (elapsed>=esCues[i].start && elapsed<esCues[i].end) { activeIdx=i; break; }
+  }
+  if (activeIdx !== lastActiveIdx) {
+    document.querySelectorAll('.subtitle-item').forEach((item,i) => {
+      item.classList.remove('active','past','upcoming');
+      if (i<activeIdx) item.classList.add('past');
+      else if (i===activeIdx) item.classList.add('active');
+      else item.classList.add('upcoming');
+    });
+    if (activeIdx>=0) {
+      const el = document.querySelector('.subtitle-item.active');
+      if (el) el.scrollIntoView({ behavior:'smooth', block:'center' });
+    }
+    lastActiveIdx = activeIdx;
+  }
+  tickId = requestAnimationFrame(tick);
+}
+
+function startEpisode() {
+  offset=0; startTime=performance.now(); elapsed=0;
+  running=true; lastActiveIdx=-2;
+  if (tickId) cancelAnimationFrame(tickId);
+  tickId = requestAnimationFrame(tick);
+  document.getElementById('play-pause-btn').textContent = '⏸ Pause';
+}
+
+document.getElementById('start-btn').addEventListener('click', () => {
+  buildSubtitleList();
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('player').style.display = 'flex';
+  startEpisode();
+});
+
+document.getElementById('play-pause-btn').addEventListener('click', () => {
+  if (running) {
+    running=false; if(tickId) cancelAnimationFrame(tickId);
+    elapsed=(performance.now()-startTime)/1000+offset;
+    document.getElementById('play-pause-btn').textContent='▶ Resume';
+  } else {
+    offset=elapsed; startTime=performance.now(); running=true;
+    tickId=requestAnimationFrame(tick);
+    document.getElementById('play-pause-btn').textContent='⏸ Pause';
+  }
+});
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+  startEpisode(); document.getElementById('subtitle-scroll').scrollTop=0;
+});
+
+document.getElementById('jump-btn').addEventListener('click', () => {
+  const el=document.querySelector('.subtitle-item.active');
+  if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+});
+
+document.getElementById('back-btn').addEventListener('click', () => {
+  running=false; if(tickId) cancelAnimationFrame(tickId);
+  document.getElementById('player').style.display='none';
+  document.getElementById('setup').style.display='flex';
+});
+
+const nudges={'m5':-5,'m2':-2,'m1':-1,'p1':1,'p2':2,'p5':5};
+Object.entries(nudges).forEach(([id,val]) => {
+  document.getElementById(`nudge-${id}`).addEventListener('click', () => {
+    if (running) { offset+=val; }
+    else { elapsed=Math.max(0,elapsed+val); offset=elapsed; }
+    lastActiveIdx=-2;
+  });
+});
+</script>
+</body>
+</html>
