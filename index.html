@@ -293,13 +293,16 @@ async function searchSubtitles() {
   document.getElementById('results-section').style.display = 'none';
 
   try {
-    const params = new URLSearchParams({ query: title.toLowerCase(), type: 'episode' });
-    if (season) params.set('season_number', season);
-    if (ep)     params.set('episode_number', ep);
+    const baseParams = new URLSearchParams({ query: title.toLowerCase(), type: 'episode' });
+    if (season) baseParams.set('season_number', season);
+    if (ep)     baseParams.set('episode_number', ep);
+
+    const esParams = new URLSearchParams(baseParams); esParams.set('languages', 'es'); esParams.sort();
+    const enParams = new URLSearchParams(baseParams); enParams.set('languages', 'en'); enParams.sort();
 
     const [esRes, enRes] = await Promise.all([
-      osGet(`https://api.opensubtitles.com/api/v1/subtitles?${params}&languages=es`, apiKey),
-      osGet(`https://api.opensubtitles.com/api/v1/subtitles?${params}&languages=en`, apiKey),
+      osGet(`https://api.opensubtitles.com/api/v1/subtitles?${esParams}`, apiKey),
+      osGet(`https://api.opensubtitles.com/api/v1/subtitles?${enParams}`, apiKey),
     ]);
 
     const esData = esRes.data || [];
