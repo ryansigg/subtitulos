@@ -293,7 +293,7 @@ async function searchSubtitles() {
   document.getElementById('results-section').style.display = 'none';
 
   try {
-    const params = new URLSearchParams({ query: title, type: 'episode' });
+    const params = new URLSearchParams({ query: title.toLowerCase(), type: 'episode' });
     if (season) params.set('season_number', season);
     if (ep)     params.set('episode_number', ep);
 
